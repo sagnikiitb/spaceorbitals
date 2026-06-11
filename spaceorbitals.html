@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Orbital Energy Conglomerate</title>
+    <title>Full Spectrum Conic Conglomerate</title>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         body {
@@ -22,6 +22,7 @@
             background-color: #161b22;
             border-bottom: 1px solid #30363d;
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
@@ -31,19 +32,25 @@
             margin: 0;
             font-size: 1.2rem;
             color: #58a6ff;
+            width: 100%;
+            margin-bottom: 15px;
         }
         .controls {
             display: flex;
+            flex-wrap: wrap;
             gap: 20px;
             align-items: center;
             font-size: 0.9rem;
+            width: 100%;
         }
         .control-group {
             display: flex;
             flex-direction: column;
+            flex: 1;
+            min-width: 200px;
         }
         label { margin-bottom: 5px; font-weight: bold; }
-        input[type=range] { width: 200px; cursor: pointer; }
+        input[type=range] { width: 100%; cursor: pointer; }
         #plotDiv {
             flex-grow: 1;
             width: 100%;
@@ -52,39 +59,43 @@
     </style>
 </head>
 <body>
-
     <div id="header">
-        <h1>Continuous 2D Orbit Conglomerate</h1>
+        <h1>Continuous Orbit Conglomerate (All Conic Sections)</h1>
         <div class="controls">
             <div class="control-group">
                 <label>Specific Energy (km²/s²): <span id="energyVal" class="value-display">-15.0</span></label>
-                <input type="range" id="energySlider" min="-50" max="-2" step="0.5" value="-15">
+                <input type="range" id="energySlider" min="-30" max="20" step="1" value="-15">
+            </div>
+            <div class="control-group">
+                <label>Viewspace Bound (km): <span id="boundVal" class="value-display">40000</span></label>
+                <input type="range" id="boundSlider" min="15000" max="15000000" step="5000" value="40000">
             </div>
             <div class="control-group">
                 <label>Density (Convolutions): <span id="densityVal" class="value-display">150</span></label>
-                <input type="range" id="densitySlider" min="50" max="400" step="10" value="150">
+                <input type="range" id="densitySlider" min="50" max="4000" step="10" value="150">
             </div>
         </div>
     </div>
-
+   
     <div id="plotDiv"></div>
 
     <script>
-        // Earth Gravitational Parameter (km^3 / s^2) and Radius (km)
         const MU = 398600;
         const R_EARTH = 6371;
 
-        // Elements
+        // UI Elements
         const energySlider = document.getElementById('energySlider');
+        const boundSlider = document.getElementById('boundSlider');
         const densitySlider = document.getElementById('densitySlider');
         const energyVal = document.getElementById('energyVal');
+        const boundVal = document.getElementById('boundVal');
         const densityVal = document.getElementById('densityVal');
 
-        // Event Listeners for UI
+        // Event Listeners
         energySlider.addEventListener('input', updatePlot);
+        boundSlider.addEventListener('input', updatePlot);
         densitySlider.addEventListener('input', updatePlot);
 
-        // Generates the 3D surface representing Earth
         function getEarthTrace() {
             const u = [], v = [], x = [], y = [], z = [];
             const resolution = 30;
@@ -113,53 +124,77 @@
             };
         }
 
-        // Generates the continuous parameterized 3D orbital curve
-        function getOrbitConglomerate(energy, convolutions) {
-            // Calculate fixed semi-major axis 'a' from energy
-            const a = -MU / (2 * energy);
-           
+        function getOrbitConglomerate(energy, viewRadius, convolutions) {
             const x_vals = [], y_vals = [], z_vals = [], color_vals = [];
-            const pointsPerConv = 100;
-            const totalPoints = convolutions * pointsPerConv;
+            const pointsPerConv = 150;
            
-            // Generate a continuous curve by slightly varying Keplerian elements over pseudo-time
-            for (let step = 0; step < totalPoints; step++) {
-                // Theta acts as our driving parameter (true anomaly + time analog)
-                const theta = (step / pointsPerConv) * 2 * Math.PI;
-
-                // Slowly varying orbital parameters to create a space-filling continuous curve
-                // We use irrational/non-harmonic divisors to prevent the orbit from repeating itself too early
-                const e = 0.45 + 0.45 * Math.sin(theta / 23.11);
-                const i = (Math.PI / 2) * (1 + Math.sin(theta / 37.53));
-                const Omega = theta / 41.27;
-                const omega = theta / 29.83;
-
-                // Radius of current 2D ellipse (polar equation)
-                const r = (a * (1 - e * e)) / (1 + e * Math.cos(theta));
-
-                // 2D Cartesian in the orbital plane
-                const x_prime = r * Math.cos(theta);
-                const y_prime = r * Math.sin(theta);
-
-                // 3D Euler Rotations (Z-X-Z Convention)
-                // 1. Argument of Periapsis (Z-axis)
-                const x1 = x_prime * Math.cos(omega) - y_prime * Math.sin(omega);
-                const y1 = x_prime * Math.sin(omega) + y_prime * Math.cos(omega);
+            // Outer loop: iterate through distinct orbital strands
+            for (let conv = 0; conv < convolutions; conv++) {
                
-                // 2. Inclination (X-axis)
-                const x2 = x1;
-                const y2 = y1 * Math.cos(i);
-                const z2 = y1 * Math.sin(i);
+                // Calculate static orbital parameters FOR THIS STRAND ONLY.
+                const t = conv * 0.5;
+                const rp = R_EARTH * (1.1 + 1.4 * (Math.sin(t / 1.13) + 1) / 2);
 
-                // 3. Longitude of Ascending Node (Z-axis)
-                const x3 = x2 * Math.cos(Omega) - y2 * Math.sin(Omega);
-                const y3 = x2 * Math.sin(Omega) + y2 * Math.cos(Omega);
-                const z3 = z2;
+                let a, e, p;
 
-                x_vals.push(x3);
-                y_vals.push(y3);
-                z_vals.push(z3);
-                color_vals.push(e); // Color trace by eccentricity
+                // Handle the 3 mathematical states
+                if (Math.abs(energy) < 1e-4) {
+                    e = 1;
+                    p = 2 * rp;
+                } else {
+                    a = -MU / (2 * energy);
+                    e = 1 - (rp / a);
+                    p = rp * (1 + e);
+                }
+
+                // Bound the geometry calculation to the Viewspace Limit
+                let cos_theta_max = (p / viewRadius - 1) / e;
+                cos_theta_max = Math.max(-1, Math.min(1, cos_theta_max));
+                const theta_max = Math.acos(cos_theta_max);
+
+                // Euler orientation angles for this specific strand
+                const i = (Math.PI / 2) * (1 + Math.sin(t / 1.753));
+                const Omega = t / 1.927;
+                const omega = t / 1.381;
+
+                // Inner loop: Draw one clean, monotonic sweep
+                for (let pt = 0; pt < pointsPerConv; pt++) {
+                    // Linear sweep from -theta_max to +theta_max
+                    const fraction = pt / (pointsPerConv - 1);
+                    const theta = -theta_max + fraction * 2 * theta_max;
+
+                    // Calculate current instantaneous radius
+                    const r = p / (1 + e * Math.cos(theta));
+
+                    // 2D Cartesian
+                    const x_prime = r * Math.cos(theta);
+                    const y_prime = r * Math.sin(theta);
+
+                    // 3D Rotations (Z-X-Z)
+                    const x1 = x_prime * Math.cos(omega) - y_prime * Math.sin(omega);
+                    const y1 = x_prime * Math.sin(omega) + y_prime * Math.cos(omega);
+                   
+                    const x2 = x1;
+                    const y2 = y1 * Math.cos(i);
+                    const z2 = y1 * Math.sin(i);
+
+                    const x3 = x2 * Math.cos(Omega) - y2 * Math.sin(Omega);
+                    const y3 = x2 * Math.sin(Omega) + y2 * Math.cos(Omega);
+                    const z3 = z2;
+
+                    x_vals.push(x3);
+                    y_vals.push(y3);
+                    z_vals.push(z3);
+                   
+                    // Cap coloration at e=2.5 for visual gradient purposes
+                    color_vals.push(Math.min(e, 2.5));
+                }
+
+                // LIFT THE PEN: Inject null values to break the line.
+                x_vals.push(null);
+                y_vals.push(null);
+                z_vals.push(null);
+                color_vals.push(null);
             }
 
             return {
@@ -171,48 +206,63 @@
                 line: {
                     width: 2,
                     color: color_vals,
-                    colorscale: 'Plasma',
+                    // Custom colorscale with a sharp break exactly at e=1 (normalized value 0.4 since cmax is 2.5)
+                    colorscale: [
+                        [0.0, '#002266'],     // e = 0.0 (Circular): Dark Blue
+                        [0.3999, '#00ffff'],  // e = 0.999 (Highly Elliptical): Bright Cyan
+                        [0.4, '#ff9900'],     // e = 1.0 (Parabolic): Bright Orange
+                        [1.0, '#990000']      // e >= 2.5 (Highly Hyperbolic): Dark Red
+                    ],
                     cmin: 0,
-                    cmax: 0.9,
+                    cmax: 2.5,
                     showscale: true,
-                    colorbar: { title: 'Eccentricity (e)', x: 0.9, titlefont: {color: '#c9d1d9'}, tickfont: {color: '#c9d1d9'} }
+                    colorbar: {
+                        title: 'Eccentricity (e)<br> <1 = Blue/Cyan<br> >=1 = Orange/Red',
+                        x: 0.9,
+                        titlefont: {color: '#c9d1d9'},
+                        tickfont: {color: '#c9d1d9'}
+                    }
                 },
                 hoverinfo: 'none',
                 name: 'Orbital Shell'
             };
         }
 
-        // Core render/update function
+        let isInitialLoad = true;
+
         function updatePlot() {
             const energy = parseFloat(energySlider.value);
+            const viewRadius = parseFloat(boundSlider.value);
             const convolutions = parseInt(densitySlider.value);
            
-            energyVal.textContent = energy.toFixed(1);
+            energyVal.textContent = energy > 0 ? "+" + energy.toFixed(1) : energy.toFixed(1);
+            boundVal.textContent = viewRadius.toLocaleString();
             densityVal.textContent = convolutions;
 
-            const a = -MU / (2 * energy);
-            // Dynamic axis scaling based on energy/semi-major axis
-            const rangeMax = a * 2.1;
-
-            const data = [getEarthTrace(), getOrbitConglomerate(energy, convolutions)];
+            const data = [getEarthTrace(), getOrbitConglomerate(energy, viewRadius, convolutions)];
 
             const layout = {
                 paper_bgcolor: '#0d1117',
                 margin: { l: 0, r: 0, b: 0, t: 0 },
                 scene: {
-                    xaxis: { title: 'X (km)', range: [-rangeMax, rangeMax], gridcolor: '#30363d', zerolinecolor: '#8b949e', color: '#c9d1d9' },
-                    yaxis: { title: 'Y (km)', range: [-rangeMax, rangeMax], gridcolor: '#30363d', zerolinecolor: '#8b949e', color: '#c9d1d9' },
-                    zaxis: { title: 'Z (km)', range: [-rangeMax, rangeMax], gridcolor: '#30363d', zerolinecolor: '#8b949e', color: '#c9d1d9' },
-                    aspectmode: 'cube',
-                    camera: { eye: { x: 1.5, y: 1.5, z: 1.2 } }
+                    xaxis: { title: 'X (km)', range: [-viewRadius, viewRadius], gridcolor: '#30363d', zerolinecolor: '#8b949e', color: '#c9d1d9' },
+                    yaxis: { title: 'Y (km)', range: [-viewRadius, viewRadius], gridcolor: '#30363d', zerolinecolor: '#8b949e', color: '#c9d1d9' },
+                    zaxis: { title: 'Z (km)', range: [-viewRadius, viewRadius], gridcolor: '#30363d', zerolinecolor: '#8b949e', color: '#c9d1d9' },
+                    aspectmode: 'cube'
                 },
                 showlegend: false
             };
 
+            // Only snap the camera eye on the very first load.
+            if (isInitialLoad) {
+                layout.scene.camera = { eye: { x: 1.5, y: 1.5, z: 1.2 } };
+                isInitialLoad = false;
+            }
+
             Plotly.react('plotDiv', data, layout);
         }
 
-        // Initialize Plot on load
+        // Initialize Plot
         updatePlot();
     </script>
 </body>
